@@ -1,11 +1,26 @@
 package id.zananet.keluargazana;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.webkit.WebView;
 
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+
+    private static final String TAG = "ZANA_FCM";
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        try {
+            String result = FcmDiagnostic.check();
+            Log.i(TAG, "HASIL FCM DIAGNOSTIC = " + result);
+        } catch (Throwable e) {
+            Log.e(TAG, "MAIN ACTIVITY FCM DIAGNOSTIC ERROR", e);
+        }
+    }
 
     @Override
     public void onBackPressed() {
