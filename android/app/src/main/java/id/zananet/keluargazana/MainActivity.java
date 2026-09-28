@@ -1,4 +1,4 @@
-package id.my.zananet.keluargazana;
+package id.zananet.keluargazana;
 
 import com.getcapacitor.BridgeActivity;
 
