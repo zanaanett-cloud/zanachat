@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'id.my.zananet.keluargazana',
+  appId: 'id.zananet.keluargazana',
   appName: 'Keluarga Zana',
   webDir: 'public',
   server: {
