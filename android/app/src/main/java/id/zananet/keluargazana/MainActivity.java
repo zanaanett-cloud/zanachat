@@ -15,15 +15,36 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        /*
-         * Jangan jalankan getToken() di UI thread.
-         * Jalankan diagnostik di background thread.
-         */
+        // TES PERTAMA: HARUS LANGSUNG MUNCUL
+        new AlertDialog.Builder(this)
+                .setTitle("KELUARGA ZANA - TEST V3")
+                .setMessage(
+                        "DIAGNOSTIC V3 AKTIF\n\n" +
+                        "Jika pesan ini muncul, berarti APK sudah memakai kode terbaru.\n\n" +
+                        "Tekan OK untuk melanjutkan pemeriksaan FCM."
+                )
+                .setPositiveButton("OK", (dialog, which) -> mulaiDiagnostic())
+                .setCancelable(false)
+                .show();
+    }
+
+    private void mulaiDiagnostic() {
+
+        new AlertDialog.Builder(this)
+                .setTitle("FCM DIAGNOSTIC")
+                .setMessage(
+                        "Pemeriksaan Firebase sedang dimulai...\n\n" +
+                        "Mohon tunggu maksimal 20 detik."
+                )
+                .setPositiveButton("Tunggu", null)
+                .show();
+
         new Thread(() -> {
 
             String result;
 
             try {
+
                 result = FcmDiagnostic.check();
 
                 Log.i(TAG, "HASIL FCM DIAGNOSTIC = " + result);
@@ -32,10 +53,11 @@ public class MainActivity extends BridgeActivity {
 
                 Log.e(TAG, "MAIN ACTIVITY FCM DIAGNOSTIC ERROR", e);
 
-                result = "FCM ERROR\n\n"
-                        + e.getClass().getName()
-                        + "\n\n"
-                        + String.valueOf(e.getMessage());
+                result =
+                        "FCM ERROR\n\n" +
+                        e.getClass().getName() +
+                        "\n\n" +
+                        String.valueOf(e.getMessage());
             }
 
             String finalResult = result;
@@ -43,7 +65,7 @@ public class MainActivity extends BridgeActivity {
             runOnUiThread(() -> {
 
                 new AlertDialog.Builder(MainActivity.this)
-                        .setTitle("FCM DIAGNOSTIC")
+                        .setTitle("HASIL FCM V3")
                         .setMessage(finalResult)
                         .setPositiveButton("OK", null)
                         .show();
