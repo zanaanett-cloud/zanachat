@@ -2,9 +2,6 @@ package id.zananet.keluargazana;
 
 import android.util.Log;
 
-import com.google.firebase.FirebaseApp;
-import com.google.firebase.messaging.FirebaseMessaging;
-
 public final class FcmDiagnostic {
 
     private static final String TAG = "ZANA_FCM";
@@ -15,30 +12,64 @@ public final class FcmDiagnostic {
         try {
             Log.i(TAG, "========== FCM DIAGNOSTIC START ==========");
 
-            if (FirebaseApp.getApps(null).isEmpty()) {
-                Log.e(TAG, "FirebaseApp BELUM TERINISIALISASI");
-                return "FIREBASE_APP_NOT_INITIALIZED";
-            }
+            Class<?> firebaseAppClass =
+                    Class.forName("com.google.firebase.FirebaseApp");
 
-            FirebaseApp app = FirebaseApp.getInstance();
+            Class<?> firebaseMessagingClass =
+                    Class.forName("com.google.firebase.messaging.FirebaseMessaging");
 
-            Log.i(TAG, "FirebaseApp OK");
-            Log.i(TAG, "Firebase projectId = " + app.getOptions().getProjectId());
-            Log.i(TAG, "Firebase applicationId = " + app.getOptions().getApplicationId());
-            Log.i(TAG, "Firebase gcmSenderId = " + app.getOptions().getGcmSenderId());
+            Log.i(TAG, "FirebaseApp class ditemukan");
+            Log.i(TAG, "FirebaseMessaging class ditemukan");
 
-            FirebaseMessaging messaging = FirebaseMessaging.getInstance();
+            Object firebaseApp =
+                    firebaseAppClass.getMethod("getInstance").invoke(null);
 
-            Log.i(TAG, "FirebaseMessaging instance OK");
-            Log.i(TAG, "FirebaseMessaging class = " + messaging.getClass().getName());
+            Log.i(TAG, "FirebaseApp.getInstance() BERHASIL");
+
+            Object options =
+                    firebaseAppClass.getMethod("getOptions").invoke(firebaseApp);
+
+            String projectId = String.valueOf(
+                    options.getClass().getMethod("getProjectId").invoke(options)
+            );
+
+            String applicationId = String.valueOf(
+                    options.getClass().getMethod("getApplicationId").invoke(options)
+            );
+
+            String gcmSenderId = String.valueOf(
+                    options.getClass().getMethod("getGcmSenderId").invoke(options)
+            );
+
+            Log.i(TAG, "Firebase projectId = " + projectId);
+            Log.i(TAG, "Firebase applicationId = " + applicationId);
+            Log.i(TAG, "Firebase gcmSenderId = " + gcmSenderId);
+
+            Object messaging =
+                    firebaseMessagingClass.getMethod("getInstance").invoke(null);
+
+            Log.i(TAG, "FirebaseMessaging.getInstance() BERHASIL");
+            Log.i(TAG, "FirebaseMessaging class = " +
+                    messaging.getClass().getName());
 
             Log.i(TAG, "========== FCM DIAGNOSTIC OK ==========");
 
             return "FIREBASE_OK";
 
         } catch (Throwable e) {
-            Log.e(TAG, "FCM DIAGNOSTIC EXCEPTION", e);
-            return "FCM_ERROR:" + e.getClass().getName() + ":" + String.valueOf(e.getMessage());
+
+            Throwable cause = e;
+
+            if (e.getCause() != null) {
+                cause = e.getCause();
+            }
+
+            Log.e(TAG, "========== FCM DIAGNOSTIC ERROR ==========", cause);
+
+            return "FCM_ERROR:" +
+                    cause.getClass().getName() +
+                    ":" +
+                    String.valueOf(cause.getMessage());
         }
     }
 }
