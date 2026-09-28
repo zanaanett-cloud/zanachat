@@ -108,7 +108,7 @@ public final class FcmDiagnostic {
                         ? "Unknown Firebase error"
                         : exception.getClass().getName()
                           + "\n"
-                          + String.valueOf(exception.getMessage());
+                          + String.valueOf(exception);
 
                 Log.e(TAG, "FCM TOKEN ERROR = " + error);
 
