@@ -30,31 +30,118 @@ public final class FcmDiagnostic {
                     firebaseAppClass.getMethod("getOptions").invoke(firebaseApp);
 
             String projectId = String.valueOf(
-                    options.getClass().getMethod("getProjectId").invoke(options)
+                    options.getClass()
+                            .getMethod("getProjectId")
+                            .invoke(options)
             );
 
             String applicationId = String.valueOf(
-                    options.getClass().getMethod("getApplicationId").invoke(options)
+                    options.getClass()
+                            .getMethod("getApplicationId")
+                            .invoke(options)
             );
 
             String gcmSenderId = String.valueOf(
-                    options.getClass().getMethod("getGcmSenderId").invoke(options)
+                    options.getClass()
+                            .getMethod("getGcmSenderId")
+                            .invoke(options)
             );
 
-            Log.i(TAG, "Firebase projectId = " + projectId);
-            Log.i(TAG, "Firebase applicationId = " + applicationId);
-            Log.i(TAG, "Firebase gcmSenderId = " + gcmSenderId);
+            Log.i(TAG, "Project ID = " + projectId);
+            Log.i(TAG, "Application ID = " + applicationId);
+            Log.i(TAG, "Sender ID = " + gcmSenderId);
 
             Object messaging =
                     firebaseMessagingClass.getMethod("getInstance").invoke(null);
 
             Log.i(TAG, "FirebaseMessaging.getInstance() BERHASIL");
-            Log.i(TAG, "FirebaseMessaging class = " +
-                    messaging.getClass().getName());
 
-            Log.i(TAG, "========== FCM DIAGNOSTIC OK ==========");
+            /*
+             * Panggil FirebaseMessaging.getToken()
+             * menggunakan reflection agar tidak menimbulkan
+             * masalah dependency compile.
+             */
+            Object task =
+                    firebaseMessagingClass
+                            .getMethod("getToken")
+                            .invoke(messaging);
 
-            return "FIREBASE_OK";
+            if (task == null) {
+                return "FCM ERROR\n\ngetToken() menghasilkan NULL";
+            }
+
+            Log.i(TAG, "FirebaseMessaging.getToken() BERHASIL dipanggil");
+
+            Class<?> taskClass = task.getClass();
+
+            long mulai = System.currentTimeMillis();
+            long timeout = 15000;
+
+            while (true) {
+                boolean complete = (Boolean) taskClass
+                        .getMethod("isComplete")
+                        .invoke(task);
+
+                if (complete) {
+                    break;
+                }
+
+                if (System.currentTimeMillis() - mulai > timeout) {
+                    return "FCM TIMEOUT\n\n"
+                            + "Firebase tersedia, tetapi getToken() "
+                            + "belum selesai dalam 15 detik.";
+                }
+
+                Thread.sleep(200);
+            }
+
+            boolean successful = (Boolean) taskClass
+                    .getMethod("isSuccessful")
+                    .invoke(task);
+
+            if (!successful) {
+                Object exception = taskClass
+                        .getMethod("getException")
+                        .invoke(task);
+
+                String error = exception == null
+                        ? "Unknown Firebase error"
+                        : exception.getClass().getName()
+                          + "\n"
+                          + String.valueOf(exception.getMessage());
+
+                Log.e(TAG, "FCM TOKEN ERROR = " + error);
+
+                return "FCM TOKEN ERROR\n\n" + error;
+            }
+
+            Object result = taskClass
+                    .getMethod("getResult")
+                    .invoke(task);
+
+            String token = String.valueOf(result);
+
+            if (token == null || token.trim().isEmpty()
+                    || "null".equalsIgnoreCase(token)) {
+
+                return "FCM TOKEN KOSONG\n\n"
+                        + "Firebase Messaging aktif tetapi token kosong.";
+            }
+
+            Log.i(TAG, "FCM TOKEN BERHASIL DIDAPAT");
+            Log.i(TAG, "FCM TOKEN PANJANG = " + token.length());
+
+            return "FCM BERHASIL\n\n"
+                    + "Project ID:\n" + projectId
+                    + "\n\n"
+                    + "Application ID:\n" + applicationId
+                    + "\n\n"
+                    + "Sender ID:\n" + gcmSenderId
+                    + "\n\n"
+                    + "Firebase Messaging:\nOK"
+                    + "\n\n"
+                    + "FCM TOKEN:\n"
+                    + token;
 
         } catch (Throwable e) {
 
@@ -66,10 +153,10 @@ public final class FcmDiagnostic {
 
             Log.e(TAG, "========== FCM DIAGNOSTIC ERROR ==========", cause);
 
-            return "FCM_ERROR:" +
-                    cause.getClass().getName() +
-                    ":" +
-                    String.valueOf(cause.getMessage());
+            return "FIREBASE ERROR\n\n"
+                    + cause.getClass().getName()
+                    + "\n\n"
+                    + String.valueOf(cause.getMessage());
         }
     }
 }
