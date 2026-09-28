@@ -45,7 +45,7 @@ public class MainActivity extends BridgeActivity {
 
             try {
 
-                result = FcmDiagnostic.check();
+                result = FcmDiagnostic.check(MainActivity.this);
 
                 Log.i(TAG, "HASIL FCM DIAGNOSTIC = " + result);
 
