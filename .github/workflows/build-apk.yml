@@ -1,0 +1,68 @@
+name: Build Keluarga Zana APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Create Firebase google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "ERROR: Secret GOOGLE_SERVICES_JSON belum tersedia."
+            exit 1
+          fi
+
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+
+          echo "google-services.json berhasil dibuat."
+          test -s android/app/google-services.json
+
+      - name: Verify Capacitor
+        run: npx cap --version
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Verify Firebase configuration
+        run: |
+          test -s android/app/google-services.json
+          echo "Firebase configuration OK."
+
+      - name: Build Debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: keluarga-zana-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
