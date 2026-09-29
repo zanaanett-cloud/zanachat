@@ -236,6 +236,8 @@ public class MainActivity extends BridgeActivity {
             return;
         }
 
+        final WebView finalWebView = webView;
+
         String script =
                 "(function(){"
                         + "try{"
@@ -256,12 +258,12 @@ public class MainActivity extends BridgeActivity {
          *
          * Tidak lagi mengirim 10 kali.
          */
-        webView.postDelayed(
+        finalWebView.postDelayed(
                 () -> {
 
                     try {
 
-                        webView.evaluateJavascript(
+                        finalWebView.evaluateJavascript(
                                 script,
                                 value -> android.util.Log.i(
                                         "ZANA_CALL",
