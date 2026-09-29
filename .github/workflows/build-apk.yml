@@ -29,6 +29,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Verify Capacitor
+        run: npx cap --version
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
       - name: Create Firebase google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
@@ -42,13 +48,6 @@ jobs:
 
           echo "google-services.json berhasil dibuat."
           test -s android/app/google-services.json
-
-      - name: Verify Capacitor
-        run: npx cap --version
-
-      - name: Sync Capacitor Android
-        run: npx cap sync android
-
       - name: Verify Firebase configuration
         run: |
           test -s android/app/google-services.json
