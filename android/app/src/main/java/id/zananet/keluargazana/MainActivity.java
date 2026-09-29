@@ -15,64 +15,46 @@ import org.json.JSONObject;
 
 public class MainActivity extends BridgeActivity {
 
+    private static String lastDeliveredCallId = "";
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        /*
-         * Android 10+:
-         * Activity dapat tampil di atas lock screen
-         * dan menyalakan layar.
-         */
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true);
-            setTurnScreenOn(true);
-        }
+        turnScreenOn();
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            getWindow().addFlags(
-                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
-                            | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-                            | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-            );
-        }
-
-        /*
-         * Coba lepaskan lock screen jika memungkinkan.
-         */
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try {
-                KeyguardManager keyguardManager =
-                        (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
-
-                if (keyguardManager != null &&
-                        keyguardManager.isKeyguardLocked()) {
-
-                    keyguardManager.requestDismissKeyguard(
-                            this,
-                            null
-                    );
-                }
-            } catch (Throwable e) {
-                android.util.Log.e(
-                        "ZANA_FULLSCREEN",
-                        "requestDismissKeyguard gagal",
-                        e
-                );
-            }
-        }
-
-        /*
-         * Cek izin Full Screen Intent Android 14/15.
-         */
         checkFullScreenPermission();
 
-        /*
-         * Jika Activity dibuka langsung oleh
-         * Full Screen Notification, teruskan data
-         * panggilan ke JavaScript.
-         */
         handleIncomingCallIntent(getIntent());
+    }
+
+    private void turnScreenOn() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                setShowWhenLocked(true);
+                setTurnScreenOn(true);
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                getWindow().addFlags(
+                        WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                                | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                                | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                );
+            }
+
+            android.util.Log.i(
+                    "ZANA_CALL",
+                    "TURN SCREEN ON V10"
+            );
+
+        } catch (Throwable e) {
+            android.util.Log.e(
+                    "ZANA_CALL",
+                    "turnScreenOn gagal",
+                    e
+            );
+        }
     }
 
     private void checkFullScreenPermission() {
@@ -101,7 +83,7 @@ public class MainActivity extends BridgeActivity {
 
             } catch (Throwable e) {
                 android.util.Log.e(
-                        "ZANA_FULLSCREEN",
+                        "ZANA_CALL",
                         "Gagal membuka pengaturan Full Screen",
                         e
                 );
@@ -115,10 +97,8 @@ public class MainActivity extends BridgeActivity {
 
         setIntent(intent);
 
-        /*
-         * Panggilan baru dapat datang ketika
-         * MainActivity sudah hidup.
-         */
+        turnScreenOn();
+
         handleIncomingCallIntent(intent);
     }
 
@@ -150,9 +130,32 @@ public class MainActivity extends BridgeActivity {
         String fromName =
                 intent.getStringExtra("fromName");
 
+        if (callId == null || callId.trim().isEmpty()) {
+            callId = "unknown-call";
+        }
+
+        /*
+         * PENTING:
+         * Satu callId hanya boleh diteruskan sekali.
+         */
+        synchronized (MainActivity.class) {
+
+            if (callId.equals(lastDeliveredCallId)) {
+
+                android.util.Log.i(
+                        "ZANA_CALL",
+                        "DUPLIKAT DIABAIKAN callId=" + callId
+                );
+
+                return;
+            }
+
+            lastDeliveredCallId = callId;
+        }
+
         android.util.Log.i(
                 "ZANA_CALL",
-                "Incoming call: callId=" + callId
+                "INCOMING CALL V10 callId=" + callId
                         + " type=" + callType
                         + " from=" + fromName
         );
@@ -163,17 +166,28 @@ public class MainActivity extends BridgeActivity {
 
             obj.put(
                     "callId",
-                    callId == null ? "" : callId
+                    callId
             );
 
             obj.put(
                     "type",
-                    callType == null ? "audio" : callType
+                    callType == null
+                            ? "audio"
+                            : callType
+            );
+
+            obj.put(
+                    "callType",
+                    callType == null
+                            ? "audio"
+                            : callType
             );
 
             obj.put(
                     "fromUserId",
-                    fromUserId == null ? "" : fromUserId
+                    fromUserId == null
+                            ? ""
+                            : fromUserId
             );
 
             obj.put(
@@ -183,15 +197,15 @@ public class MainActivity extends BridgeActivity {
                             : fromName
             );
 
-            String json = obj.toString();
-
-            deliverIncomingCallToWebView(json);
+            deliverIncomingCallToWebView(
+                    obj.toString()
+            );
 
         } catch (Throwable e) {
 
             android.util.Log.e(
                     "ZANA_CALL",
-                    "Gagal meneruskan incoming call ke WebView",
+                    "Gagal membuat data incoming call",
                     e
             );
         }
@@ -204,13 +218,21 @@ public class MainActivity extends BridgeActivity {
         WebView webView = null;
 
         try {
+
             if (getBridge() != null) {
                 webView = getBridge().getWebView();
             }
+
         } catch (Throwable ignored) {
         }
 
         if (webView == null) {
+
+            android.util.Log.e(
+                    "ZANA_CALL",
+                    "WebView belum tersedia"
+            );
+
             return;
         }
 
@@ -223,51 +245,42 @@ public class MainActivity extends BridgeActivity {
                         + "{detail:" + json + "}"
                         + ")"
                         + ");"
-                        + "console.log('[KZ NATIVE CALL] event diterima');"
+                        + "console.log('[KZ V10] incoming call');"
                         + "}catch(e){"
-                        + "console.error('[KZ NATIVE CALL] error',e);"
+                        + "console.error('[KZ V10] error',e);"
                         + "}"
                         + "})()";
 
         /*
-         * WebView kadang belum selesai loading
-         * ketika Full Screen Activity dibuka.
+         * HANYA SATU event.
          *
-         * Coba beberapa kali agar event tidak hilang.
+         * Tidak lagi mengirim 10 kali.
          */
-        final WebView finalWebView = webView;
+        webView.postDelayed(
+                () -> {
 
-        for (int i = 0; i < 10; i++) {
+                    try {
 
-            final int attempt = i;
+                        webView.evaluateJavascript(
+                                script,
+                                value -> android.util.Log.i(
+                                        "ZANA_CALL",
+                                        "Event incoming call V10 dikirim"
+                                )
+                        );
 
-            finalWebView.postDelayed(
-                    () -> {
+                    } catch (Throwable e) {
 
-                        try {
+                        android.util.Log.e(
+                                "ZANA_CALL",
+                                "evaluateJavascript gagal",
+                                e
+                        );
+                    }
 
-                            finalWebView.evaluateJavascript(
-                                    script,
-                                    value -> android.util.Log.i(
-                                            "ZANA_CALL",
-                                            "Event call dikirim attempt="
-                                                    + attempt
-                                    )
-                            );
-
-                        } catch (Throwable e) {
-
-                            android.util.Log.e(
-                                    "ZANA_CALL",
-                                    "evaluateJavascript gagal",
-                                    e
-                            );
-                        }
-
-                    },
-                    500L * i
-            );
-        }
+                },
+                700
+        );
     }
 
     @Override
@@ -280,25 +293,7 @@ public class MainActivity extends BridgeActivity {
 
                 getBridge()
                         .getWebView()
-                        .evaluateJavascript(
-                                "(function(){"
-                                        + "if(document.getElementById('chat')"
-                                        + " && !document.getElementById('chat').classList.contains('hidden')){"
-                                        + "if(typeof backHome==='function'){"
-                                        + "backHome();"
-                                        + "return 'handled';"
-                                        + "}"
-                                        + "}"
-                                        + "return 'normal';"
-                                        + "})()",
-                                value -> {
-
-                                    if (!"\"handled\"".equals(value)) {
-                                        MainActivity.super.onBackPressed();
-                                    }
-
-                                }
-                        );
+                        .goBack();
 
                 return;
             }
