@@ -22,9 +22,7 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
 
         turnScreenOn();
-
         checkFullScreenPermission();
-
         handleIncomingCallIntent(getIntent());
     }
 
@@ -45,7 +43,7 @@ public class MainActivity extends BridgeActivity {
 
             android.util.Log.i(
                     "ZANA_CALL",
-                    "TURN SCREEN ON V10"
+                    "TURN SCREEN ON V13"
             );
 
         } catch (Throwable e) {
@@ -98,7 +96,6 @@ public class MainActivity extends BridgeActivity {
         setIntent(intent);
 
         turnScreenOn();
-
         handleIncomingCallIntent(intent);
     }
 
@@ -134,10 +131,6 @@ public class MainActivity extends BridgeActivity {
             callId = "unknown-call";
         }
 
-        /*
-         * PENTING:
-         * Satu callId hanya boleh diteruskan sekali.
-         */
         synchronized (MainActivity.class) {
 
             if (callId.equals(lastDeliveredCallId)) {
@@ -155,7 +148,7 @@ public class MainActivity extends BridgeActivity {
 
         android.util.Log.i(
                 "ZANA_CALL",
-                "INCOMING CALL V10 callId=" + callId
+                "INCOMING CALL V13 callId=" + callId
                         + " type=" + callType
                         + " from=" + fromName
         );
@@ -237,51 +230,111 @@ public class MainActivity extends BridgeActivity {
         }
 
         final WebView finalWebView = webView;
+        final String finalJson = json;
 
-        String script =
+        /*
+         * Data disimpan sebagai GLOBAL terlebih dahulu.
+         *
+         * Jadi walaupun JavaScript belum siap menerima event,
+         * data panggilan tetap tersedia ketika app.js selesai loading.
+         */
+        String storeScript =
                 "(function(){"
                         + "try{"
-                        + "window.dispatchEvent("
-                        + "new CustomEvent("
-                        + "'kz-native-incoming-call',"
-                        + "{detail:" + json + "}"
-                        + ")"
-                        + ");"
-                        + "console.log('[KZ V10] incoming call');"
+                        + "window.kzNativeIncomingCall="
+                        + finalJson
+                        + ";"
+                        + "console.log('[KZ V13] native call data tersimpan');"
                         + "}catch(e){"
-                        + "console.error('[KZ V10] error',e);"
+                        + "console.error('[KZ V13] store error',e);"
                         + "}"
                         + "})()";
 
         /*
-         * HANYA SATU event.
+         * Event dikirim beberapa kali.
          *
-         * Tidak lagi mengirim 10 kali.
+         * Bridge JavaScript memiliki dedupe berdasarkan callId,
+         * sehingga pengiriman ulang tidak membuat layar panggilan
+         * muncul berkali-kali.
          */
-        finalWebView.postDelayed(
-                () -> {
+        final long[] delays = {
+                100,
+                500,
+                1000,
+                1500,
+                2000,
+                3000,
+                5000
+        };
 
-                    try {
+        for (long delay : delays) {
 
-                        finalWebView.evaluateJavascript(
-                                script,
-                                value -> android.util.Log.i(
-                                        "ZANA_CALL",
-                                        "Event incoming call V10 dikirim"
-                                )
-                        );
+            final long currentDelay = delay;
 
-                    } catch (Throwable e) {
+            finalWebView.postDelayed(
+                    () -> {
 
-                        android.util.Log.e(
-                                "ZANA_CALL",
-                                "evaluateJavascript gagal",
-                                e
-                        );
-                    }
+                        try {
 
-                },
-                700
+                            finalWebView.evaluateJavascript(
+                                    storeScript,
+                                    value -> {
+
+                                        android.util.Log.i(
+                                                "ZANA_CALL",
+                                                "DATA CALL V13 tersimpan delay="
+                                                        + currentDelay
+                                        );
+
+                                    }
+                            );
+
+                            String eventScript =
+                                    "(function(){"
+                                            + "try{"
+                                            + "window.dispatchEvent("
+                                            + "new CustomEvent("
+                                            + "'kz-native-incoming-call',"
+                                            + "{detail:window.kzNativeIncomingCall}"
+                                            + ")"
+                                            + ");"
+                                            + "console.log('[KZ V13] incoming call event');"
+                                            + "}catch(e){"
+                                            + "console.error('[KZ V13] event error',e);"
+                                            + "}"
+                                            + "})()";
+
+                            finalWebView.evaluateJavascript(
+                                    eventScript,
+                                    value -> {
+
+                                        android.util.Log.i(
+                                                "ZANA_CALL",
+                                                "EVENT incoming call V13 dikirim delay="
+                                                        + currentDelay
+                                        );
+
+                                    }
+                            );
+
+                        } catch (Throwable e) {
+
+                            android.util.Log.e(
+                                    "ZANA_CALL",
+                                    "evaluateJavascript V13 gagal delay="
+                                            + currentDelay,
+                                    e
+                            );
+                        }
+
+                    },
+                    currentDelay
+            );
+        }
+
+        android.util.Log.i(
+                "ZANA_CALL",
+                "RELIABLE DELIVERY V13 AKTIF - 7 percobaan"
         );
     }
 
