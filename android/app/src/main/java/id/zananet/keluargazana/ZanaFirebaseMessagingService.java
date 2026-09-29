@@ -212,14 +212,52 @@ public class ZanaFirebaseMessagingService
                 data.get("fromName")
         );
 
-        PendingIntent fullScreenIntent =
-                PendingIntent.getActivity(
-                        this,
-                        CALL_NOTIFICATION_ID,
-                        intent,
-                        PendingIntent.FLAG_UPDATE_CURRENT
-                                | PendingIntent.FLAG_IMMUTABLE
-                );
+        PendingIntent fullScreenIntent;
+
+        /*
+         * Android 15:
+         * PendingIntent yang dibuat oleh aplikasi harus
+         * secara eksplisit mengizinkan background activity launch.
+         *
+         * Ini penting agar Full Screen Intent incoming call
+         * benar-benar dapat membawa MainActivity ke depan
+         * ketika HP sedang sleep/terkunci.
+         */
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+
+            android.app.ActivityOptions options =
+                    android.app.ActivityOptions.makeBasic();
+
+            options.setPendingIntentCreatorBackgroundActivityStartMode(
+                    android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+            );
+
+            fullScreenIntent =
+                    PendingIntent.getActivity(
+                            this,
+                            CALL_NOTIFICATION_ID,
+                            intent,
+                            PendingIntent.FLAG_UPDATE_CURRENT
+                                    | PendingIntent.FLAG_IMMUTABLE,
+                            options.toBundle()
+                    );
+
+            android.util.Log.i(
+                    TAG,
+                    "ANDROID 14/15 BAL CREATOR ENABLED"
+            );
+
+        } else {
+
+            fullScreenIntent =
+                    PendingIntent.getActivity(
+                            this,
+                            CALL_NOTIFICATION_ID,
+                            intent,
+                            PendingIntent.FLAG_UPDATE_CURRENT
+                                    | PendingIntent.FLAG_IMMUTABLE
+                    );
+        }
 
         String from =
                 data.get("fromName");
