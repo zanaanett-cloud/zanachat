@@ -28,7 +28,7 @@ public class ZanaFirebaseMessagingService
             "keluarga_zana_messages_v2";
 
     private static final String CALL_CHANNEL =
-            "keluarga_zana_calls_v2";
+            "keluarga_zana_calls_v3";
 
     @Override
     public void onMessageReceived(
@@ -40,6 +40,7 @@ public class ZanaFirebaseMessagingService
         );
 
         try {
+
             Map<String, String> data =
                     remoteMessage.getData();
 
@@ -48,11 +49,27 @@ public class ZanaFirebaseMessagingService
                     "FCM DATA = " + data
             );
 
-            wakeScreen();
+            String type = data.get("type");
 
-            showNotification(data);
+            /*
+             * Untuk panggilan kita tidak hanya
+             * mengandalkan WakeLock.
+             *
+             * Full-Screen Intent akan dipakai.
+             */
+
+            if ("incoming_call".equals(type)) {
+
+                showIncomingCall(data);
+
+            } else {
+
+                wakeScreen();
+                showNormalNotification(data);
+            }
 
         } catch (Throwable e) {
+
             android.util.Log.e(
                     TAG,
                     "Gagal memproses FCM",
@@ -63,109 +80,65 @@ public class ZanaFirebaseMessagingService
 
     private void wakeScreen() {
 
-        PowerManager powerManager =
-                (PowerManager)
-                        getSystemService(
-                                Context.POWER_SERVICE
-                        );
+        try {
 
-        if (powerManager == null) {
-            return;
-        }
+            PowerManager powerManager =
+                    (PowerManager)
+                            getSystemService(
+                                    Context.POWER_SERVICE
+                            );
 
-        boolean screenOn;
-
-        if (Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.KITKAT_WATCH) {
-
-            screenOn =
-                    powerManager.isInteractive();
-
-        } else {
-
-            screenOn =
-                    powerManager.isScreenOn();
-        }
-
-        android.util.Log.i(
-                TAG,
-                "Screen sebelum wake = " + screenOn
-        );
-
-        if (!screenOn) {
-
-            PowerManager.WakeLock wakeLock =
-                    powerManager.newWakeLock(
-                            PowerManager.SCREEN_BRIGHT_WAKE_LOCK
-                                    | PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                            TAG + ":WakeLock"
-                    );
-
-            try {
-
-                wakeLock.acquire(5000);
-
-                android.util.Log.i(
-                        TAG,
-                        "WAKE LOCK ACQUIRED"
-                );
-
-            } finally {
-
-                if (wakeLock.isHeld()) {
-                    wakeLock.release();
-                }
+            if (powerManager == null) {
+                return;
             }
-        }
-    }
 
-    private void showNotification(
-            Map<String, String> data) {
+            boolean screenOn;
 
-        String type = data.get("type");
-        String title = data.get("title");
-        String body = data.get("body");
+            if (Build.VERSION.SDK_INT >=
+                    Build.VERSION_CODES.KITKAT_WATCH) {
 
-        if (title == null ||
-                title.trim().isEmpty()) {
-
-            title =
-                    "incoming_call".equals(type)
-                            ? "Panggilan masuk"
-                            : "Keluarga Zana";
-        }
-
-        if (body == null ||
-                body.trim().isEmpty()) {
-
-            if ("incoming_call".equals(type)) {
-
-                String from =
-                        data.get("fromName");
-
-                if (from == null ||
-                        from.trim().isEmpty()) {
-
-                    from = "Keluarga Zana";
-                }
-
-                body =
-                        from +
-                        ("video".equals(
-                                data.get("callType"))
-                                ? " mengajak video call"
-                                : " mengajak telepon");
+                screenOn =
+                        powerManager.isInteractive();
 
             } else {
 
-                body = "Ada pesan baru.";
+                screenOn =
+                        powerManager.isScreenOn();
             }
-        }
 
-        String channelId =
-                "incoming_call".equals(type)
-                        ? CALL_CHANNEL
-                        : MESSAGE_CHANNEL;
+            if (!screenOn) {
+
+                PowerManager.WakeLock wakeLock =
+                        powerManager.newWakeLock(
+                                PowerManager.SCREEN_BRIGHT_WAKE_LOCK
+                                        | PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                                TAG + ":WakeLock"
+                        );
+
+                try {
+
+                    wakeLock.acquire(5000);
+
+                } finally {
+
+                    if (wakeLock.isHeld()) {
+                        wakeLock.release();
+                    }
+                }
+            }
+
+        } catch (Throwable e) {
+
+            android.util.Log.e(
+                    TAG,
+                    "WakeLock gagal",
+                    e
+            );
+        }
+    }
+
+    private void showIncomingCall(
+            Map<String, String> data) {
 
         NotificationManager manager =
                 (NotificationManager)
@@ -177,11 +150,160 @@ public class ZanaFirebaseMessagingService
             return;
         }
 
-        createChannel(
-                manager,
-                channelId,
-                "incoming_call".equals(type)
+        createCallChannel(manager);
+
+        Intent intent =
+                new Intent(
+                        this,
+                        MainActivity.class
+                );
+
+        intent.addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                );
+
+        intent.putExtra(
+                "incoming_call",
+                true
         );
+
+        intent.putExtra(
+                "callId",
+                data.get("callId")
+        );
+
+        intent.putExtra(
+                "callType",
+                data.get("callType")
+        );
+
+        intent.putExtra(
+                "fromUserId",
+                data.get("fromUserId")
+        );
+
+        intent.putExtra(
+                "fromName",
+                data.get("fromName")
+        );
+
+        PendingIntent fullScreenIntent =
+                PendingIntent.getActivity(
+                        this,
+                        9001,
+                        intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                                | PendingIntent.FLAG_IMMUTABLE
+                );
+
+        String from =
+                data.get("fromName");
+
+        if (from == null ||
+                from.trim().isEmpty()) {
+
+            from = "Keluarga Zana";
+        }
+
+        String body;
+
+        if ("video".equals(
+                data.get("callType"))) {
+
+            body =
+                    from +
+                    " mengajak video call";
+
+        } else {
+
+            body =
+                    from +
+                    " mengajak telepon";
+        }
+
+        NotificationCompat.Builder builder =
+                new NotificationCompat.Builder(
+                        this,
+                        CALL_CHANNEL
+                )
+                .setSmallIcon(
+                        android.R.drawable.ic_menu_call
+                )
+                .setContentTitle(
+                        "Panggilan masuk"
+                )
+                .setContentText(body)
+                .setStyle(
+                        new NotificationCompat.BigTextStyle()
+                                .bigText(body)
+                )
+                .setPriority(
+                        NotificationCompat.PRIORITY_MAX
+                )
+                .setCategory(
+                        NotificationCompat.CATEGORY_CALL
+                )
+                .setVisibility(
+                        NotificationCompat.VISIBILITY_PUBLIC
+                )
+                .setOngoing(true)
+                .setAutoCancel(false)
+                .setFullScreenIntent(
+                        fullScreenIntent,
+                        true
+                )
+                .setContentIntent(
+                        fullScreenIntent
+                )
+                .setDefaults(
+                        NotificationCompat.DEFAULT_ALL
+                );
+
+        manager.notify(
+                9001,
+                builder.build()
+        );
+
+        android.util.Log.i(
+                TAG,
+                "FULL SCREEN CALL NOTIFICATION DIBUAT"
+        );
+    }
+
+    private void showNormalNotification(
+            Map<String, String> data) {
+
+        NotificationManager manager =
+                (NotificationManager)
+                        getSystemService(
+                                Context.NOTIFICATION_SERVICE
+                        );
+
+        if (manager == null) {
+            return;
+        }
+
+        createMessageChannel(manager);
+
+        String title =
+                data.get("title");
+
+        String body =
+                data.get("body");
+
+        if (title == null ||
+                title.trim().isEmpty()) {
+
+            title = "Keluarga Zana";
+        }
+
+        if (body == null ||
+                body.trim().isEmpty()) {
+
+            body = "Ada pesan baru.";
+        }
 
         Intent intent =
                 new Intent(
@@ -207,7 +329,7 @@ public class ZanaFirebaseMessagingService
         NotificationCompat.Builder builder =
                 new NotificationCompat.Builder(
                         this,
-                        channelId
+                        MESSAGE_CHANNEL
                 )
                 .setSmallIcon(
                         android.R.drawable.ic_dialog_info
@@ -219,12 +341,10 @@ public class ZanaFirebaseMessagingService
                                 .bigText(body)
                 )
                 .setPriority(
-                        NotificationCompat.PRIORITY_MAX
+                        NotificationCompat.PRIORITY_HIGH
                 )
                 .setCategory(
-                        "incoming_call".equals(type)
-                                ? NotificationCompat.CATEGORY_CALL
-                                : NotificationCompat.CATEGORY_MESSAGE
+                        NotificationCompat.CATEGORY_MESSAGE
                 )
                 .setVisibility(
                         NotificationCompat.VISIBILITY_PUBLIC
@@ -243,20 +363,10 @@ public class ZanaFirebaseMessagingService
                                 & 0x7fffffff),
                 builder.build()
         );
-
-        android.util.Log.i(
-                TAG,
-                "NOTIFIKASI DIBUAT: " +
-                        title +
-                        " / " +
-                        body
-        );
     }
 
-    private void createChannel(
-            NotificationManager manager,
-            String channelId,
-            boolean isCall) {
+    private void createMessageChannel(
+            NotificationManager manager) {
 
         if (Build.VERSION.SDK_INT <
                 Build.VERSION_CODES.O) {
@@ -264,37 +374,25 @@ public class ZanaFirebaseMessagingService
             return;
         }
 
-        NotificationChannel channel =
-                manager.getNotificationChannel(
-                        channelId
-                );
+        if (manager.getNotificationChannel(
+                MESSAGE_CHANNEL) != null) {
 
-        if (channel != null) {
             return;
         }
 
-        String name =
-                isCall
-                        ? "Panggilan Keluarga Zana"
-                        : "Pesan Keluarga Zana";
-
-        channel =
+        NotificationChannel channel =
                 new NotificationChannel(
-                        channelId,
-                        name,
+                        MESSAGE_CHANNEL,
+                        "Pesan Keluarga Zana",
                         NotificationManager.IMPORTANCE_HIGH
                 );
 
         channel.enableVibration(true);
 
         channel.setVibrationPattern(
-                isCall
-                        ? new long[]{
-                            0,700,500,700,500,700
-                        }
-                        : new long[]{
-                            0,300,200,300
-                        }
+                new long[]{
+                        0,300,200,300
+                }
         );
 
         Uri soundUri =
@@ -302,12 +400,10 @@ public class ZanaFirebaseMessagingService
                         RingtoneManager.TYPE_NOTIFICATION
                 );
 
-        AudioAttributes audioAttributes =
+        AudioAttributes attributes =
                 new AudioAttributes.Builder()
                         .setUsage(
-                                isCall
-                                        ? AudioAttributes.USAGE_NOTIFICATION_RINGTONE
-                                        : AudioAttributes.USAGE_NOTIFICATION
+                                AudioAttributes.USAGE_NOTIFICATION
                         )
                         .setContentType(
                                 AudioAttributes.CONTENT_TYPE_SONIFICATION
@@ -316,7 +412,73 @@ public class ZanaFirebaseMessagingService
 
         channel.setSound(
                 soundUri,
-                audioAttributes
+                attributes
+        );
+
+        channel.setLockscreenVisibility(
+                android.app.Notification.VISIBILITY_PUBLIC
+        );
+
+        manager.createNotificationChannel(channel);
+    }
+
+    private void createCallChannel(
+            NotificationManager manager) {
+
+        if (Build.VERSION.SDK_INT <
+                Build.VERSION_CODES.O) {
+
+            return;
+        }
+
+        if (manager.getNotificationChannel(
+                CALL_CHANNEL) != null) {
+
+            return;
+        }
+
+        NotificationChannel channel =
+                new NotificationChannel(
+                        CALL_CHANNEL,
+                        "Panggilan Keluarga Zana",
+                        NotificationManager.IMPORTANCE_HIGH
+                );
+
+        channel.setDescription(
+                "Panggilan masuk Keluarga Zana"
+        );
+
+        channel.enableVibration(true);
+
+        channel.setVibrationPattern(
+                new long[]{
+                        0,
+                        700,
+                        500,
+                        700,
+                        500,
+                        700
+                }
+        );
+
+        Uri soundUri =
+                RingtoneManager.getDefaultUri(
+                        RingtoneManager.TYPE_RINGTONE
+                );
+
+        AudioAttributes attributes =
+                new AudioAttributes.Builder()
+                        .setUsage(
+                                AudioAttributes.USAGE_NOTIFICATION_RINGTONE
+                        )
+                        .setContentType(
+                                AudioAttributes.CONTENT_TYPE_SONIFICATION
+                        )
+                        .build();
+
+        channel.setSound(
+                soundUri,
+                attributes
         );
 
         channel.setLockscreenVisibility(
