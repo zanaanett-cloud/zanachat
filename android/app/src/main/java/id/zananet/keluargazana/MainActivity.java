@@ -30,6 +30,105 @@ public class MainActivity extends BridgeActivity {
         turnScreenOn();
         checkFullScreenPermission();
         handleIncomingCallIntent(getIntent());
+        handleCallCancelIntent(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+
+        turnScreenOn();
+        handleIncomingCallIntent(intent);
+        handleCallCancelIntent(intent);
+    }
+
+    private void handleCallCancelIntent(Intent intent) {
+        try {
+            if (intent == null) {
+                return;
+            }
+
+            boolean cancelled =
+                    intent.getBooleanExtra(
+                            "call_cancel",
+                            false
+                    );
+
+            if (!cancelled) {
+                return;
+            }
+
+            String callId =
+                    intent.getStringExtra("callId");
+
+            android.util.Log.i(
+                    "ZANA_CALL",
+                    "CALL CANCEL DITERIMA callId=" + callId
+            );
+
+            String json =
+                    new JSONObject()
+                            .put(
+                                    "callId",
+                                    callId == null ? "" : callId
+                            )
+                            .toString();
+
+            deliverCallCancelToWebView(json);
+
+        } catch (Throwable e) {
+
+            android.util.Log.e(
+                    "ZANA_CALL",
+                    "Gagal handle CALL CANCEL",
+                    e
+            );
+        }
+    }
+
+    private void deliverCallCancelToWebView(String json) {
+        try {
+
+            if (getBridge() == null ||
+                    getBridge().getWebView() == null) {
+
+                android.util.Log.w(
+                        "ZANA_CALL",
+                        "WebView belum siap untuk CALL CANCEL"
+                );
+
+                return;
+            }
+
+            String finalJson =
+                    JSONObject.quote(json);
+
+            getBridge()
+                    .getWebView()
+                    .evaluateJavascript(
+                            "window.kzNativeCallCancel="
+                                    + finalJson
+                                    + ";"
+                                    + "window.dispatchEvent("
+                                    + "new CustomEvent('kz-native-call-cancel')"
+                                    + ");",
+                            null
+                    );
+
+            android.util.Log.i(
+                    "ZANA_CALL",
+                    "CALL CANCEL EVENT DIKIRIM KE WEBVIEW"
+            );
+
+        } catch (Throwable e) {
+
+            android.util.Log.e(
+                    "ZANA_CALL",
+                    "Gagal kirim CALL CANCEL ke WebView",
+                    e
+            );
+        }
     }
 
     private void turnScreenOn() {
@@ -95,15 +194,6 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-
-        setIntent(intent);
-
-        turnScreenOn();
-        handleIncomingCallIntent(intent);
-    }
 
     private void handleIncomingCallIntent(Intent intent) {
 
@@ -379,22 +469,97 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onBackPressed() {
-
         try {
+            WebView webView = getBridge().getWebView();
 
-            if (getBridge() != null &&
-                    getBridge().getWebView() != null) {
-
-                getBridge()
-                        .getWebView()
-                        .goBack();
-
+            if (webView == null) {
+                super.onBackPressed();
                 return;
             }
 
-        } catch (Throwable ignored) {
-        }
+            String js =
+                    "(function(){"
+                    + "try{"
 
-        super.onBackPressed();
+                    // Incoming call
+                    + "var incoming=document.getElementById('incomingCall');"
+                    + "if(incoming && !incoming.classList.contains('hidden')){"
+                    + "if(typeof closeIncoming==='function'){"
+                    + "closeIncoming();"
+                    + "return 'handled';"
+                    + "}"
+                    + "}"
+
+                    // Voice call
+                    + "var call=document.getElementById('call');"
+                    + "if(call && !call.classList.contains('hidden')){"
+                    + "if(typeof endCall==='function'){"
+                    + "endCall();"
+                    + "return 'handled';"
+                    + "}"
+                    + "}"
+
+                    // Video call
+                    + "var video=document.getElementById('video');"
+                    + "if(video && !video.classList.contains('hidden')){"
+                    + "if(typeof endCall==='function'){"
+                    + "endCall();"
+                    + "return 'handled';"
+                    + "}"
+                    + "}"
+
+                    // Chat
+                    + "var chat=document.getElementById('chat');"
+                    + "if(chat && !chat.classList.contains('hidden')){"
+                    + "if(typeof backHome==='function'){"
+                    + "backHome();"
+                    + "return 'handled';"
+                    + "}"
+                    + "}"
+
+                    // Calls / Contacts / Settings
+                    + "var calls=document.getElementById('calls');"
+                    + "var contacts=document.getElementById('contacts');"
+                    + "var settings=document.getElementById('settings');"
+
+                    + "if((calls && !calls.classList.contains('hidden'))||"
+                    + "(contacts && !contacts.classList.contains('hidden'))||"
+                    + "(settings && !settings.classList.contains('hidden'))){"
+
+                    + "if(typeof showHome==='function'){"
+                    + "showHome();"
+                    + "return 'handled';"
+                    + "}"
+
+                    + "if(typeof navigateMenu==='function'){"
+                    + "navigateMenu('home');"
+                    + "return 'handled';"
+                    + "}"
+                    + "}"
+
+                    + "}catch(e){"
+                    + "console.error('[ZANA_BACK]',e);"
+                    + "}"
+
+                    + "return 'normal';"
+                    + "})()";
+
+            webView.evaluateJavascript(
+                    js,
+                    value -> {
+                        if (!"\"handled\"".equals(value)) {
+                            MainActivity.super.onBackPressed();
+                        }
+                    }
+            );
+
+        } catch (Throwable e) {
+            android.util.Log.e(
+                    "ZANA_BACK",
+                    "Gagal menangani tombol Back",
+                    e
+            );
+            super.onBackPressed();
+        }
     }
 }

@@ -61,6 +61,23 @@ public class ZanaFirebaseMessagingService
 
                 showIncomingCall(data);
 
+            } else if ("call_cancel".equals(type)) {
+
+                android.util.Log.i(
+                        TAG,
+                        "CALL CANCEL DITERIMA"
+                );
+
+                /*
+                 * Batalkan notification native incoming call.
+                 */
+                cancelIncomingCallNotification();
+
+                /*
+                 * Kirim pembatalan ke MainActivity/WebView.
+                 */
+                deliverCallCancelToMainActivity(data);
+
             } else {
 
                 wakeScreen();
@@ -143,6 +160,78 @@ public class ZanaFirebaseMessagingService
             android.util.Log.e(
                     TAG,
                     "WakeLock gagal",
+                    e
+            );
+        }
+    }
+
+    private void cancelIncomingCallNotification() {
+        try {
+            NotificationManager manager =
+                    (NotificationManager)
+                            getSystemService(
+                                    Context.NOTIFICATION_SERVICE
+                            );
+
+            if (manager != null) {
+                manager.cancel(CALL_NOTIFICATION_ID);
+
+                android.util.Log.i(
+                        TAG,
+                        "NOTIFICATION CALL 9001 DIBATALKAN"
+                );
+            }
+
+        } catch (Throwable e) {
+
+            android.util.Log.e(
+                    TAG,
+                    "Gagal membatalkan notification call",
+                    e
+            );
+        }
+    }
+
+    private void deliverCallCancelToMainActivity(
+            Map<String, String> data
+    ) {
+        try {
+
+            Intent intent =
+                    new Intent(
+                            this,
+                            MainActivity.class
+                    );
+
+            intent.addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK
+                            | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            | Intent.FLAG_ACTIVITY_CLEAR_TOP
+            );
+
+            intent.putExtra(
+                    "call_cancel",
+                    true
+            );
+
+            intent.putExtra(
+                    "callId",
+                    data.get("callId")
+            );
+
+            startActivity(intent);
+
+            android.util.Log.i(
+                    TAG,
+                    "CALL CANCEL DIKIRIM KE MAIN ACTIVITY callId="
+                            + data.get("callId")
+            );
+
+        } catch (Throwable e) {
+
+            android.util.Log.e(
+                    TAG,
+                    "Gagal mengirim CALL CANCEL ke MainActivity",
                     e
             );
         }
