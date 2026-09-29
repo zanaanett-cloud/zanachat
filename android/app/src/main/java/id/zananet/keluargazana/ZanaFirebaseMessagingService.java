@@ -60,6 +60,18 @@ public class ZanaFirebaseMessagingService
 
             if ("incoming_call".equals(type)) {
 
+                /*
+                 * V9:
+                 * Panggilan juga harus membangunkan layar
+                 * sebelum Full Screen Notification dijalankan.
+                 */
+                wakeScreen();
+
+                android.util.Log.i(
+                        TAG,
+                        "WAKE SCREEN UNTUK INCOMING CALL"
+                );
+
                 showIncomingCall(data);
 
             } else {
