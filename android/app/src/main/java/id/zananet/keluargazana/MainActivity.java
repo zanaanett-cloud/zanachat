@@ -1,5 +1,7 @@
 package id.zananet.keluargazana;
 
+import android.app.NotificationManager;
+
 import android.app.KeyguardManager;
 import android.content.Intent;
 import android.net.Uri;
@@ -19,6 +21,10 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // V5: hentikan notification panggilan native setelah Activity terbuka.
+        cancelIncomingCallNotification();
+
+
         super.onCreate(savedInstanceState);
 
         turnScreenOn();
@@ -337,6 +343,39 @@ public class MainActivity extends BridgeActivity {
                 "RELIABLE DELIVERY V13 AKTIF - 7 percobaan"
         );
     }
+
+
+    /*
+     * V5:
+     * Setelah Full Screen Activity terbuka, notification
+     * incoming call ID 9001 tidak boleh tetap hidup.
+     *
+     * Ringtone sekarang ditangani WebAudio.
+     */
+    private void cancelIncomingCallNotification() {
+        try {
+            NotificationManager manager =
+                    (NotificationManager)
+                            getSystemService(
+                                    NOTIFICATION_SERVICE
+                            );
+
+            if (manager != null) {
+                manager.cancel(9001);
+                android.util.Log.i(
+                        "ZANA_CALL",
+                        "NOTIFICATION CALL 9001 DIBATALKAN"
+                );
+            }
+        } catch (Throwable e) {
+            android.util.Log.e(
+                    "ZANA_CALL",
+                    "Gagal membatalkan notification call",
+                    e
+            );
+        }
+    }
+
 
     @Override
     public void onBackPressed() {

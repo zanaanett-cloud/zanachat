@@ -23,7 +23,7 @@ public class ZanaFirebaseMessagingService
             "ZANA_FCM";
 
     private static final String CALL_CHANNEL =
-            "keluarga_zana_calls_v4";
+            "keluarga_zana_calls_v5";
 
     private static final int CALL_NOTIFICATION_ID =
             9001;
@@ -318,16 +318,6 @@ public class ZanaFirebaseMessagingService
                 )
                 .setContentIntent(
                         fullScreenIntent
-                )
-                .setVibrate(
-                        new long[]{
-                                0,
-                                500,
-                                500,
-                                500,
-                                500,
-                                500
-                        }
                 );
 
         /*
@@ -372,42 +362,16 @@ public class ZanaFirebaseMessagingService
                     android.app.Notification.VISIBILITY_PUBLIC
             );
 
-            channel.enableVibration(true);
-
-            channel.setVibrationPattern(
-                    new long[]{
-                            0,
-                            500,
-                            500,
-                            500,
-                            500,
-                            500
-                    }
-            );
-
-            android.net.Uri ringtone =
-                    android.media.RingtoneManager
-                            .getDefaultUri(
-                                    android.media.RingtoneManager
-                                            .TYPE_RINGTONE
-                            );
-
-            android.media.AudioAttributes audioAttributes =
-                    new android.media.AudioAttributes.Builder()
-                            .setUsage(
-                                    android.media.AudioAttributes
-                                            .USAGE_NOTIFICATION_RINGTONE
-                            )
-                            .setContentType(
-                                    android.media.AudioAttributes
-                                            .CONTENT_TYPE_SONIFICATION
-                            )
-                            .build();
-
-            channel.setSound(
-                    ringtone,
-                    audioAttributes
-            );
+            /*
+             * V5:
+             * Notification native dibuat SILENT.
+             *
+             * Ringtone panggilan ditangani oleh WebAudio
+             * Keluarga Zana agar tidak ada dua sumber ringtone.
+             */
+            channel.enableVibration(false);
+            channel.setVibrationPattern(null);
+            channel.setSound(null, null);
 
             manager.createNotificationChannel(
                     channel
